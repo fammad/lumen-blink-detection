@@ -1,5 +1,11 @@
 # Lumen
 
+![Made with Python](https://img.shields.io/badge/Made%20with-Python-3776AB?logo=python&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
+![Blink Detection F1](https://img.shields.io/badge/Blink%20Detection%20F1-0.92-brightgreen)
+![NordiCHI 2026](https://img.shields.io/badge/NordiCHI-2026-blueviolet)
+
+
 ![Lumen dome in CALM, BREAK, and BREATHING states, with a hand demonstrating the touch interaction](assets/lumen.jpeg)
 
 A webcam-driven computer vision pipeline (MediaPipe Face Mesh, blink detection, rolling baseline, risk scoring) controls a physical LED object over serial to an ESP32-S3, built to show a full CV-to-hardware loop working end to end.
