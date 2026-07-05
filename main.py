@@ -2,7 +2,7 @@
 main.py — Lumen integration loop.
 
 Live system: webcam → blink detection → rolling baseline → risk engine
-→ state badge + console log.
+→ state badge + console log → serial → ESP32-S3 dome (if connected).
 
 Modes:
   Auto      — risk engine decides state. Requires face. No face → NO SIGNAL.
@@ -11,6 +11,11 @@ Modes:
 
 DEMO_MODE = True:  baseline samples every 1s (settles in 30s).
 DEMO_MODE = False: baseline samples every 60s (real mode, settles in 30 min).
+
+Hardware is optional. If SERIAL_PORT is None or the port can't be opened,
+the loop runs exactly as before: webcam window only, no dome. Find your
+port with `ls /dev/tty.*` (macOS/Linux) or the Arduino IDE's port list
+(Windows: "COM3" etc.), then set SERIAL_PORT below.
 
 Keyboard:
   q   quit
@@ -26,11 +31,12 @@ import cv2
 import time
 from collections import deque
 import mediapipe as mp
+import serial
 
-from blink_detector import calculate_ear, LEFT_EYE, RIGHT_EYE
-from baseline import BaselineEngine
-from risk_engine import RiskEngine
-from state import DomeState
+from core.blink_detector import calculate_ear, LEFT_EYE, RIGHT_EYE
+from core.baseline import BaselineEngine
+from core.risk_engine import RiskEngine
+from core.state import DomeState
 
 
 # ---------- Config ----------
@@ -44,6 +50,39 @@ FACE_LOST_THRESHOLD = 30.0      # seconds without face → pin break clock to "n
 BASELINE_INTERVAL = 1.0 if DEMO_MODE else 60.0
 
 FORCE_STATE = None              # None = auto. Set via keys 1/2/3.
+
+# ---------- Dome (serial) ----------
+SERIAL_PORT = None              # e.g. "/dev/tty.usbmodem1101" or "COM5". None = no hardware.
+SERIAL_BAUD = 115200
+
+DOME_COMMANDS = {
+    DomeState.CALM:      b"C",
+    DomeState.ATTENTION: b"A",
+    DomeState.BREAK:     b"B",
+}
+
+dome_serial = None
+if SERIAL_PORT:
+    try:
+        dome_serial = serial.Serial(SERIAL_PORT, SERIAL_BAUD, timeout=0)
+        time.sleep(2)  # ESP32 resets on serial connect; give it time to boot
+        print(f"[ 0.0s] Dome connected on {SERIAL_PORT}")
+    except (serial.SerialException, OSError) as e:
+        print(f"[ 0.0s] Could not open {SERIAL_PORT} ({e}), running without dome")
+        dome_serial = None
+
+
+def send_to_dome(state):
+    """Write a single state command to the dome. No-op if not connected."""
+    if dome_serial is None:
+        return
+    cmd = DOME_COMMANDS.get(state)
+    if cmd is None:
+        return
+    try:
+        dome_serial.write(cmd)
+    except serial.SerialException:
+        pass  # dome dropped mid-session, don't crash the vision loop over it
 
 
 # ---------- Colors ----------
@@ -231,12 +270,15 @@ while capture.isOpened():
     if state_label != previous_label:
         if FORCE_STATE is not None:
             print(f"[{elapsed:6.1f}s] state: {previous_label} → {state_label}")
+            send_to_dome(FORCE_STATE)
         elif face_present:
             print(f"[{elapsed:6.1f}s] state: {previous_label} → {state_label} "
                   f"(risk={risk['risk_score']:.2f}, "
                   f"blink={risk['blink_risk']:.2f}, focus={risk['focus_risk']:.2f})")
+            send_to_dome(auto_state)
         else:
             print(f"[{elapsed:6.1f}s] state: {previous_label} → {state_label} (face lost)")
+            # no dome command, NO SIGNAL isn't a dome state, just holds the last one
         previous_label = state_label
 
     # --- Overlay ---
@@ -291,4 +333,6 @@ while capture.isOpened():
 
 capture.release()
 cv2.destroyAllWindows()
+if dome_serial is not None:
+    dome_serial.close()
 print(f"[{time.time() - session_start:6.1f}s] Lumen stopped.")
