@@ -12,6 +12,10 @@ __pycache__/
 # IDE
 .vscode/
 
-# Local docs not for public repo
+# Private: personal notes, submission drafts, recordings with faces
 ROADMAP_v2.md
 deadlines.md
+Lumen Submission/
+Photos/
+*.mov
+lumen_showcase/

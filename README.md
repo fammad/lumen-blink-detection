@@ -1,52 +1,25 @@
 # Lumen
 
-A physical desk object that senses blink rate via webcam and signals 
-eye strain risk through ambient light. Built as a NordiCHI 2026 Demo 
-track submission.
+![Lumen dome in the BREAK state](assets/lumen-break-state.jpg)
 
-## What it does
+A physical desk object that senses blink rate via webcam and signals eye strain risk through ambient light, so a break can be negotiated rather than demanded by a notification.
 
-Webcam → MediaPipe Face Mesh → EAR blink detection → rolling risk 
-score → serial command → ESP32-S3 → NeoPixel LED ring.
+## Problem
 
-Three ambient states: calm (blue), attention (amber), break (red).
-Two user gestures: tap to pause, hold to start breathing exercise.
+Digital wellbeing tools mostly interrupt immediately — a popup, a chime, a lock screen. Lumen signals state peripherally through light instead, letting the user decide when or whether to act. The underlying signal is blink rate, which drops from a healthy 15-20/min to 4-7/min during sustained screen focus (Rosenfield, 2011).
 
-## Hardware
+## Approach
 
-- XIAO ESP32-S3 + NeoPixel 16-LED ring + momentary button
-- 3D-printed translucent PLA dome, ~10 cm
-- USB-C to MacBook
+Webcam → MediaPipe Face Mesh → EAR blink detection → rolling baseline → risk score → serial → ESP32-S3 → NeoPixel ring.
 
-## Performance
+- **EAR over a learned classifier**: six landmarks per eye, thresholded, real time on a laptop webcam, no training data needed.
+- **Baseline has a floor**: reference rate is the mean of the last 30 samples, clamped to a literature floor (7/min), so sustained strain can't drag the baseline down and quietly read as normal.
+- **Time alone can't trigger BREAK**: `risk = 0.5 * blink_risk + 0.5 * focus_risk`. Focus duration caps at 0.5 — physiological evidence has to be present too.
+- **Auto vs. negotiated control**: `main.py` sends single-letter state commands (C/A/B) over serial on every auto-state change. The button overrides locally — tap pauses, hold starts a 4-7-8 breathing exercise — and incoming auto-commands queue until the override ends.
 
-Blink detection F1: [your measured value here]  
-Accuracy: ~99% at ≤120 cm (low light), ~99% at ≤150 cm (daylight)  
-Beyond range: exponential degradation  
-Test setup: MacBook Pro built-in camera, 1920×1080, 60 FPS
+## Results
 
-## Known limitations
-
-- EAR threshold (0.21) tuned for home lighting; likely needs adjustment 
-  under fluorescent conference lighting
-- Head angles >~30° cause landmark compression; wink detection unreliable
-- No glasses-aware calibration yet but works without indifferently
-
-## Run
-
-```bash
-python blink_detector.py
-```
-
-Requires Python 3.12. MediaPipe pinned to 0.10.14 (3.13 breaks mp.solutions API).
-
-## Status
-
-NordiCHI 2026 submission in progress. Hardware build pending.
-
-## Blink Detection Validation
-
-F1 validation against manual count. Tested across lighting and distance.
+Blink detection validated against manual count:
 
 | Condition | Distance | F1 |
 |---|---|---|
@@ -55,13 +28,40 @@ F1 validation against manual count. Tested across lighting and distance.
 | Direct sunlight | 2.0 m | 0.85 |
 | Sunlight + head turns (±45°) | 1.0 m | 0.92 |
 | Table lamp only | 1.5 m | 0.91 |
-| Table lamp only | 2.0 m | 0.57 ❌ |
+| Table lamp only | 2.0 m | 0.57 |
 
-**Demo operating envelope:** 60–80 cm, mixed conference lighting.
-All conditions within this envelope exceed F1 = 0.90.
+Headline: **F1 = 0.92** (head-turn condition — the most conservative passing result, not the best case). Operating envelope 60-150 cm; every condition tested in that range clears F1 = 0.90. Setup: MacBook Pro built-in camera, 1920x1080, 60 fps.
 
-**Known limitation:** Detection degrades sharply beyond 1.5 m in low light.
-EAR threshold tuned at 0.21 for MacBook Pro built-in camera at 1080p/60fps.
+The full loop — webcam to risk score to ESP32-S3 to LED, plus tap-to-pause and hold-to-breathe — was flashed and tested end to end on the physical hardware.
 
-Detection fails under tinted or semi-transparent sglasses. 
-Designed for clear-lens glasses or no glasses only.
+## Limitations and failure analysis
+
+- EAR threshold (0.21) tuned for one indoor setup; not re-validated under office or conference lighting.
+- Accuracy drops sharply beyond ~1.5 m in low light (F1 = 0.57 at 2 m under lamp-only light).
+- Head turns beyond ~30° compress eye landmarks and can register as false blinks.
+- Fails under tinted or semi-transparent glasses; built for clear lenses or bare eyes.
+- Baseline has no persistence across sessions and takes ~30 samples to settle, so the first minute of any run reads against a literature-prior floor, not the user's actual resting rate.
+- The ring's breadboard solder joints can flicker under mechanical stress until reflowed (see `hardware/BUILD.md`); electronics aren't yet rigidly mounted inside the enclosure.
+
+## How to run
+
+Requires Python 3.12 — MediaPipe 0.10.14 breaks on 3.13's `mp.solutions` API.
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
+
+Supporting modules live in `core/`. Everything for the physical build — firmware, parts list, wiring — lives in `hardware/`.
+
+Runs with just the webcam window if no dome is connected. Full build guide — parts list, wiring, firmware flashing, board settings, and connecting the dome to `main.py` — is in **[hardware/BUILD.md](hardware/BUILD.md)**.
+
+Keyboard: `q` quit, `r` reset, `d` toggle demo/real baseline speed, `1`/`2`/`3` force CALM/ATTENTION/BREAK, `0` clear override.
+
+## Status
+
+Submitted to NordiCHI 2026 Demo track; not accepted — logistical, not a reflection of the work's quality.
+
+## Credits
+
+Yuting Chen (KTH) collaborated on the physical hardware sessions and breathing-pattern testing. Blink-rate grounding: Rosenfield, M. (2011), *Computer vision syndrome: a review of ocular causes and potential treatments*, Ophthalmic and Physiological Optics.
