@@ -1,11 +1,11 @@
-# Lumen: Blink Detection to Embedded Actuation
+# Lumen: Blink Detection with Desk Companion
 
 ![Made with Python](https://img.shields.io/badge/Made%20with-Python-3776AB?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 ![Blink Detection F1](https://img.shields.io/badge/Blink%20Detection%20F1-0.92-brightgreen)
 ![NordiCHI 2026](https://img.shields.io/badge/NordiCHI-2026-blueviolet)
 
-![Lumen dome in CALM, BREAK, and BREATHING states, with a hand demonstrating the touch interaction](assets/lumen.jpeg)
+![Lumen mediapipleine demonstration. Camera view](assets/lumen.gif)
 
 A webcam-driven computer vision pipeline (MediaPipe Face Mesh, blink detection, rolling baseline, risk scoring) controls a physical LED object over serial to an ESP32-S3, built to show a full CV-to-hardware loop working end to end.
 
@@ -25,6 +25,8 @@ Webcam >> MediaPipe Face Mesh >> Eye Aspect Ratio (EAR) blink detection >> rolli
 - **Rolling baseline with a literature floor**: `BaselineEngine` keeps a 30-sample rolling mean, pre-filled with a literature-derived prior (15 blinks/min, Rosenfield 2011) so it's meaningful from sample one, floored at 7 blinks/min so a sustained low rate can't drag its own reference down and quietly read as normal.
 - **Weighted risk score**: `RiskEngine` computes `risk_score = 0.5 × blink_risk + 0.5 × focus_risk`, where `blink_risk = max(0, (reference − current_rate) / reference)` and `focus_risk` saturates at 1.0 after 20 minutes without a break. CALM below 0.3, ATTENTION below 0.6, BREAK at or above.
 - **State machine driving physical hardware**: `main.py` sends single-letter state commands (C/A/B) over serial on every state change. The firmware runs its own local logic for the tap/hold button gestures and queues incoming commands during an override, so software and hardware each own a distinct part of the behavior rather than one blindly relaying to the other.
+
+![Lumen dome in CALM, BREAK, and BREATHING states, with a hand demonstrating the touch interaction](assets/lumen.jpeg)
 
 ## Results
 
