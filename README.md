@@ -5,7 +5,7 @@
 ![Blink Detection F1](https://img.shields.io/badge/Blink%20Detection%20F1-0.92-brightgreen)
 ![NordiCHI 2026](https://img.shields.io/badge/NordiCHI-2026-blueviolet)
 
-![Lumen mediapipleine demonstration. Camera view](<img src="assets/lumen.gif" width="100%" alt="Lumen live demo">)
+<img src="assets/lumen.gif" width="100%" alt="Lumen live demo, webcam feed driving the physical dome in real time">
 
 A webcam-driven computer vision pipeline (MediaPipe Face Mesh, blink detection, rolling baseline, risk scoring) controls a physical LED object over serial to an ESP32-S3, built to show a full CV-to-hardware loop working end to end.
 
